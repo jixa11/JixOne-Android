@@ -36,7 +36,7 @@ jobs:
         run: |
           if [ -n "$JIXONE_KEYSTORE_B64" ]; then
             echo "$JIXONE_KEYSTORE_B64" | base64 --decode > jixone.jks
-            printf 'storeFile=jixone.jks\nkeyAlias=%s\nkeyPassword=%s\nstorePassword=%s\n' \
+            printf 'storeFile=../jixone.jks\nkeyAlias=%s\nkeyPassword=%s\nstorePassword=%s\n' \
               "$JIXONE_KEY_ALIAS" "$JIXONE_KEY_PASSWORD" "$JIXONE_STORE_PASSWORD" > keystore.properties
           else
             echo "No signing secrets — the APK will be unsigned"
