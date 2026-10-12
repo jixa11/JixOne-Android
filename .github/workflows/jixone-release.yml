@@ -1,0 +1,62 @@
+name: JixOne release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: 21
+          distribution: "temurin"
+          cache: 'gradle'
+
+      - name: Accept SDK licenses
+        run: yes | /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager --licenses
+
+      - name: Set up signing
+        env:
+          JIXONE_KEYSTORE_B64: ${{ secrets.JIXONE_KEYSTORE_B64 }}
+          JIXONE_KEY_ALIAS: ${{ secrets.JIXONE_KEY_ALIAS }}
+          JIXONE_KEY_PASSWORD: ${{ secrets.JIXONE_KEY_PASSWORD }}
+          JIXONE_STORE_PASSWORD: ${{ secrets.JIXONE_STORE_PASSWORD }}
+        run: |
+          if [ -n "$JIXONE_KEYSTORE_B64" ]; then
+            echo "$JIXONE_KEYSTORE_B64" | base64 --decode > jixone.jks
+            printf 'storeFile=jixone.jks\nkeyAlias=%s\nkeyPassword=%s\nstorePassword=%s\n' \
+              "$JIXONE_KEY_ALIAS" "$JIXONE_KEY_PASSWORD" "$JIXONE_STORE_PASSWORD" > keystore.properties
+          else
+            echo "No signing secrets — the APK will be unsigned"
+          fi
+
+      - name: Build core release APK
+        run: ./gradlew assembleCoreRelease -DskipFormatKtlint --stacktrace
+
+      - name: Rename APK
+        run: |
+          cd app/build/outputs/apk/core/release
+          for f in JixOne-*-release-unsigned.apk; do
+            [ -e "$f" ] && mv "$f" "JixOne-$(echo "$f" | sed 's/-unsigned//')"
+          done
+          ls -la
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: app/build/outputs/apk/core/release/*.apk
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
